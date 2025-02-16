@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OMI Clone Dashboard</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      #summary {
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Daily Summary</h1>
+    <div id="summary">Waiting for summary...</div>
+    <script>
+      // Replace with your actual backend IP address
+      const backendUrl = "http://192.168.1.134:5000/api/summary";
+
+      function fetchSummary() {
+        fetch(backendUrl)
+          .then((response) => response.json())
+          .then((data) => {
+            console.log("Fetched summary:", data);
+            document.getElementById("summary").innerText = data.summary;
+          })
+          .catch((error) => console.error("Error fetching summary:", error));
+      }
+
+      // Fetch summary every 5 seconds
+      setInterval(fetchSummary, 5000);
+      fetchSummary(); // Initial call
+    </script>
+  </body>
+</html>
