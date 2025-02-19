@@ -19,15 +19,15 @@
   </head>
   <body>
     <h1>Audio Stream Dashboard</h1>
-    <div id="status">Audio is streaming from the ESP32 to the backend.</div>
+    <div id="status">
+      Audio is streaming from the ESP32 to the backend via WebSocket.
+    </div>
     <button id="downloadButton">Download Recorded Audio</button>
-
     <script>
-      // When the button is clicked, trigger a download from the /api/save_audio endpoint
       document
         .getElementById("downloadButton")
         .addEventListener("click", function () {
-          window.location.href = "http://192.168.1.134:5000/api/save_audio";
+          window.location.href = "http://192.168.1.134:5000/save_audio";
         });
     </script>
   </body>
