@@ -14,7 +14,6 @@
         cursor: pointer;
         margin: 10px 5px 0 0;
       }
-      #transcription,
       #summary {
         margin-top: 20px;
         padding: 10px;
@@ -28,52 +27,13 @@
   </head>
   <body>
     <h1>Daily Summary Dashboard</h1>
-    <button id="downloadButton">Download Recorded Audio</button>
-    <button id="processSegmentButton">Process Segment</button>
     <button id="generateSummaryButton">Generate Summary</button>
-
-    <div id="transcription">Segment transcription will appear here.</div>
     <div id="summary">Summary of your day will appear here.</div>
 
     <script>
       const baseUrl = "http://192.168.1.134:5000";
-      const downloadUrl = `${baseUrl}/save_audio`;
-      const processSegmentUrl = `${baseUrl}/process_segment`;
       const summaryUrl = `${baseUrl}/generate_summary`;
 
-      // Download Recorded Audio (current audio buffer)
-      document
-        .getElementById("downloadButton")
-        .addEventListener("click", () => {
-          const link = document.createElement("a");
-          link.href = downloadUrl;
-          link.download = "recorded_audio.wav";
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        });
-
-      // Process current audio segment (transcribe and add to log)
-      document
-        .getElementById("processSegmentButton")
-        .addEventListener("click", async () => {
-          const transcriptionDiv = document.getElementById("transcription");
-          transcriptionDiv.textContent = "Processing audio segment...";
-          try {
-            const response = await fetch(processSegmentUrl);
-            if (!response.ok) {
-              throw new Error(`HTTP error: ${response.status}`);
-            }
-            const data = await response.json();
-            transcriptionDiv.textContent =
-              data.segment_transcription || "No transcription available.";
-          } catch (error) {
-            console.error("Error processing segment:", error);
-            transcriptionDiv.textContent = "Error processing audio segment.";
-          }
-        });
-
-      // Generate summary from transcription log
       document
         .getElementById("generateSummaryButton")
         .addEventListener("click", async () => {
