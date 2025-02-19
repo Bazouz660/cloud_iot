@@ -1,33 +1,106 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Audio Stream Dashboard</title>
+    <meta charset="UTF-8" />
+    <title>Audio Dashboard with Gemini Summary</title>
     <style>
       body {
         font-family: Arial, sans-serif;
         margin: 20px;
       }
-      #status {
-        margin: 20px 0;
-      }
-      #downloadButton {
+      button {
         padding: 10px 20px;
         font-size: 16px;
         cursor: pointer;
+        margin: 10px 5px 0 0;
+      }
+      #transcription,
+      #summary {
+        margin-top: 20px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        min-height: 40px;
+        max-width: 600px;
+        word-wrap: break-word;
       }
     </style>
   </head>
   <body>
-    <h1>Audio Stream Dashboard</h1>
-    <div id="status">
-      Audio is streaming from the ESP32 to the backend via WebSocket.
-    </div>
+    <h1>Audio Dashboard</h1>
     <button id="downloadButton">Download Recorded Audio</button>
+    <button id="transcribeButton">Transcribe Audio</button>
+    <button id="generateSummaryButton">Generate Summary</button>
+
+    <div id="transcription">Transcription will appear here.</div>
+    <div id="summary">Summary will appear here.</div>
+
     <script>
+      const baseUrl = "http://192.168.1.134:5000";
+      const downloadUrl = `${baseUrl}/save_audio`;
+      const transcribeUrl = `${baseUrl}/speech_to_text`;
+      const summaryUrl = `${baseUrl}/generate_summary`;
+
+      // Download Recorded Audio
       document
         .getElementById("downloadButton")
-        .addEventListener("click", function () {
-          window.location.href = "http://192.168.1.134:5000/save_audio";
+        .addEventListener("click", () => {
+          const link = document.createElement("a");
+          link.href = downloadUrl;
+          link.download = "recorded_audio.wav";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
+
+      // Transcribe Audio
+      document
+        .getElementById("transcribeButton")
+        .addEventListener("click", async () => {
+          const transcriptionDiv = document.getElementById("transcription");
+          transcriptionDiv.textContent = "Transcribing audio...";
+          try {
+            const response = await fetch(transcribeUrl);
+            if (!response.ok) {
+              throw new Error(`HTTP error: ${response.status}`);
+            }
+            const data = await response.json();
+            transcriptionDiv.textContent =
+              data.transcription || "No transcription available.";
+          } catch (error) {
+            console.error("Error fetching transcription:", error);
+            transcriptionDiv.textContent = "Error transcribing audio.";
+          }
+        });
+
+      // Generate Summary from Transcription
+      document
+        .getElementById("generateSummaryButton")
+        .addEventListener("click", async () => {
+          const transcriptionDiv = document.getElementById("transcription");
+          const summaryDiv = document.getElementById("summary");
+          const textToSummarize = transcriptionDiv.textContent;
+          if (!textToSummarize || textToSummarize.startsWith("Error")) {
+            summaryDiv.textContent =
+              "No valid transcription available to summarize.";
+            return;
+          }
+          summaryDiv.textContent = "Generating summary...";
+          try {
+            const response = await fetch(summaryUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text: textToSummarize }),
+            });
+            if (!response.ok) {
+              throw new Error(`HTTP error: ${response.status}`);
+            }
+            const data = await response.json();
+            summaryDiv.textContent = data.summary || "No summary available.";
+          } catch (error) {
+            console.error("Error generating summary:", error);
+            summaryDiv.textContent = "Error generating summary.";
+          }
         });
     </script>
   </body>
