@@ -1,57 +1,48 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-from google import genai
+import wave
+import struct
+import io
 
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests
+CORS(app)
 
-latest_summary = "No summary yet."
-mic_values = []
-
-# Initialize the Google generative AI client with your API key.
-client = genai.Client(api_key="AIzaSyDyFSz_BSSZAIqFP_BXRZw02FjU99bX1do")
+# Global buffer to store 16-bit audio samples (as integers)
+audio_buffer = []
 
 @app.route('/api/audio', methods=['POST'])
 def process_audio():
-    global latest_summary
-    data = request.get_json()
-    mic_value = data.get('micValue', 0)
+    # Read binary data from the request
+    raw_data = request.get_data()
+    # Convert the binary data to a list of 16-bit samples
+    num_samples = len(raw_data) // 2
+    samples = list(struct.unpack("<" + "h"*num_samples, raw_data))
 
-    # Append the new mic value to our list
-    mic_values.append(mic_value)
-    print(f"Received mic value: {mic_value}")
+    # Append to your global audio buffer
+    audio_buffer.extend(samples)
+    print(f"Received {num_samples} samples. Total stored: {len(audio_buffer)}")
 
-    # Check if we've accumulated enough values to generate a summary.
-    if len(mic_values) >= 5:
-        # Build a prompt from the mic values. Here we treat the numbers as simulated noise levels.
-        prompt = "The following are simulated microphone readings (noise levels) recorded throughout the day: " + \
-                 ", ".join(str(v) for v in mic_values) + \
-                 ". Based on these readings, provide a brief summary of the user's day."
+    return jsonify({"status": "ok", "samples_received": num_samples})
 
-        try:
-            # Call the Gemini 2.0 Flash model
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
-            latest_summary = response.text
-            print(f"Generated summary: {latest_summary}")
-        except Exception as e:
-            latest_summary = "Error generating AI summary."
-            print(f"Error calling AI model: {e}")
 
-        # Clear the list after generating the summary
-        mic_values.clear()
-    else:
-        # If not enough data, update a placeholder message.
-        latest_summary = f"Collected {len(mic_values)} microphone values so far."
+@app.route('/api/save_audio', methods=['GET'])
+def save_audio():
+    if not audio_buffer:
+        return jsonify({"status": "No audio data available."}), 400
 
-    return jsonify({"summary": latest_summary})
-
-@app.route('/api/summary', methods=['GET'])
-def get_summary():
-    return jsonify({"summary": latest_summary})
+    # Create an in-memory WAV file
+    output = io.BytesIO()
+    with wave.open(output, "wb") as wav_file:
+        wav_file.setnchannels(1)       # Mono audio
+        wav_file.setsampwidth(2)         # 16-bit samples (2 bytes)
+        wav_file.setframerate(16000)     # Sample rate (Hz)
+        # Write each sample as little-endian 16-bit
+        for sample in audio_buffer:
+            wav_file.writeframes(struct.pack("<h", int(sample)))
+    output.seek(0)
+    # Optionally, clear the buffer after saving:
+    # audio_buffer.clear()
+    return send_file(output, mimetype="audio/wav", as_attachment=True, download_name="recorded_audio.wav")
 
 if __name__ == '__main__':
-    # Run on all interfaces so the ESP32 can connect.
     app.run(host='0.0.0.0', port=5000, debug=True)
