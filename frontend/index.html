@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Audio Dashboard with Gemini Summary</title>
+    <title>Daily Summary Dashboard</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -27,21 +27,21 @@
     </style>
   </head>
   <body>
-    <h1>Audio Dashboard</h1>
+    <h1>Daily Summary Dashboard</h1>
     <button id="downloadButton">Download Recorded Audio</button>
-    <button id="transcribeButton">Transcribe Audio</button>
+    <button id="processSegmentButton">Process Segment</button>
     <button id="generateSummaryButton">Generate Summary</button>
 
-    <div id="transcription">Transcription will appear here.</div>
-    <div id="summary">Summary will appear here.</div>
+    <div id="transcription">Segment transcription will appear here.</div>
+    <div id="summary">Summary of your day will appear here.</div>
 
     <script>
       const baseUrl = "http://192.168.1.134:5000";
       const downloadUrl = `${baseUrl}/save_audio`;
-      const transcribeUrl = `${baseUrl}/speech_to_text`;
+      const processSegmentUrl = `${baseUrl}/process_segment`;
       const summaryUrl = `${baseUrl}/generate_summary`;
 
-      // Download Recorded Audio
+      // Download Recorded Audio (current audio buffer)
       document
         .getElementById("downloadButton")
         .addEventListener("click", () => {
@@ -53,45 +53,34 @@
           document.body.removeChild(link);
         });
 
-      // Transcribe Audio
+      // Process current audio segment (transcribe and add to log)
       document
-        .getElementById("transcribeButton")
+        .getElementById("processSegmentButton")
         .addEventListener("click", async () => {
           const transcriptionDiv = document.getElementById("transcription");
-          transcriptionDiv.textContent = "Transcribing audio...";
+          transcriptionDiv.textContent = "Processing audio segment...";
           try {
-            const response = await fetch(transcribeUrl);
+            const response = await fetch(processSegmentUrl);
             if (!response.ok) {
               throw new Error(`HTTP error: ${response.status}`);
             }
             const data = await response.json();
             transcriptionDiv.textContent =
-              data.transcription || "No transcription available.";
+              data.segment_transcription || "No transcription available.";
           } catch (error) {
-            console.error("Error fetching transcription:", error);
-            transcriptionDiv.textContent = "Error transcribing audio.";
+            console.error("Error processing segment:", error);
+            transcriptionDiv.textContent = "Error processing audio segment.";
           }
         });
 
-      // Generate Summary from Transcription
+      // Generate summary from transcription log
       document
         .getElementById("generateSummaryButton")
         .addEventListener("click", async () => {
-          const transcriptionDiv = document.getElementById("transcription");
           const summaryDiv = document.getElementById("summary");
-          const textToSummarize = transcriptionDiv.textContent;
-          if (!textToSummarize || textToSummarize.startsWith("Error")) {
-            summaryDiv.textContent =
-              "No valid transcription available to summarize.";
-            return;
-          }
           summaryDiv.textContent = "Generating summary...";
           try {
-            const response = await fetch(summaryUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ text: textToSummarize }),
-            });
+            const response = await fetch(summaryUrl);
             if (!response.ok) {
               throw new Error(`HTTP error: ${response.status}`);
             }

@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, send_file
 from flask_sock import Sock
-from flask_cors import CORS  # Enable CORS
+from flask_cors import CORS
 import struct
 import io
 import wave
@@ -11,8 +11,9 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 sock = Sock(app)
 
-# Global buffer to store incoming 16-bit audio samples
-audio_buffer = []
+# Global buffers:
+audio_buffer = []         # Holds raw 16-bit audio samples for the current segment
+transcription_log = []    # Holds transcriptions of processed segments
 
 # Initialize Gemini client (replace with your actual API key)
 gemini_client = genai.Client(api_key="AIzaSyDyFSz_BSSZAIqFP_BXRZw02FjU99bX1do")
@@ -46,11 +47,13 @@ def save_audio():
     output.seek(0)
     return send_file(output, mimetype="audio/wav", as_attachment=True, download_name="recorded_audio.wav")
 
-@app.route('/speech_to_text')
-def speech_to_text():
+@app.route('/process_segment')
+def process_segment():
+    global audio_buffer, transcription_log
     if not audio_buffer:
-        return jsonify({"error": "No audio data available."}), 400
+        return jsonify({"error": "No audio data available for this segment."}), 400
 
+    # Create a WAV file from the current audio segment
     output = io.BytesIO()
     with wave.open(output, "wb") as wav_file:
         wav_file.setnchannels(1)
@@ -64,28 +67,32 @@ def speech_to_text():
     with sr.AudioFile(output) as source:
         audio_data = recognizer.record(source)
     try:
-        # Use French for recognition (change language as needed)
+        # Change language if needed; here French is used ("fr-FR")
         text = recognizer.recognize_google(audio_data, language="fr-FR")
-        print("Transcription successful:", text)
-        return jsonify({"transcription": text})
+        transcription_log.append(text)
+        print("Segment transcription successful:", text)
+        # Clear the current audio buffer for the next segment
+        audio_buffer = []
+        return jsonify({"segment_transcription": text})
     except sr.UnknownValueError:
-        error_msg = "Could not understand audio."
+        error_msg = "Could not understand audio segment."
         print(error_msg)
-        return jsonify({"transcription": error_msg})
+        return jsonify({"segment_transcription": error_msg})
     except sr.RequestError as e:
         error_msg = f"Speech recognition service error: {e}"
         print(error_msg)
-        return jsonify({"transcription": error_msg})
+        return jsonify({"segment_transcription": error_msg})
 
-@app.route('/generate_summary', methods=['POST'])
+@app.route('/generate_summary', methods=['GET'])
 def generate_summary():
-    data = request.get_json()
-    text = data.get('text', '')
-    if not text:
-        return jsonify({"error": "No text provided."}), 400
+    global transcription_log
+    if not transcription_log:
+        return jsonify({"error": "No transcription log available."}), 400
 
-    # Build a prompt for Gemini – adjust as needed.
-    prompt = f"Please provide a concise summary of the following text:\n\n{text}"
+    # Combine all segment transcriptions into one text block
+    combined_text = " ".join(transcription_log)
+    prompt = (f"Here is a log of events from a user's day: {combined_text} "
+              f"Please provide a concise and insightful summary of the user's day, in chronological order.")
     try:
         response = gemini_client.models.generate_content(
             model="gemini-2.0-flash",  # Adjust model name if needed
